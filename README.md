@@ -43,3 +43,4 @@ Luego visita `http://localhost:3000`.
 - 3 vidas con invencibilidad temporal al reaparecer (parpadeo)
 - Asteroides se parten en fragmentos más pequeños al ser destruidos
 - Partículas de explosión al destruir asteroides
+- Estrella fugaz: asteroide dorado veloz que aparece cada 8–15 s, se desvanece sola con el tiempo y otorga 250 puntos si logras destruirla
