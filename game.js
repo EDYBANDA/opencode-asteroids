@@ -250,6 +250,7 @@ class Ship {
     this.invincible    = 3;
     this.shootCooldown = 0;
     this.speedBoost    = 0;
+    this.tripleShot    = 0;
     this.dead          = false;
   }
 
@@ -258,6 +259,7 @@ class Ship {
     if (this.invincible    > 0) this.invincible    -= dt;
     if (this.shootCooldown > 0) this.shootCooldown -= dt;
     if (this.speedBoost    > 0) this.speedBoost    -= dt;
+    if (this.tripleShot    > 0) this.tripleShot    -= dt;
 
     const ROT   = 3.5;   // rad/s
     const THRUST = this.speedBoost > 0 ? 520 : 260;  // px/s² (x2 con "Velocidad")
@@ -284,6 +286,15 @@ class Ship {
     const NOSE = 21;
     const ox = this.x + Math.cos(this.angle) * NOSE;
     const oy = this.y + Math.sin(this.angle) * NOSE;
+    // Abanico de 3 balas mientras dura el triple shot
+    if (this.tripleShot > 0) {
+      const SPREAD = 0.15;   // rad entre balas
+      return [
+        new Bullet(ox, oy, this.angle - SPREAD),
+        new Bullet(ox, oy, this.angle),
+        new Bullet(ox, oy, this.angle + SPREAD),
+      ];
+    }
     return [new Bullet(ox, oy, this.angle)];
   }
 
@@ -440,6 +451,9 @@ function update(dt) {
     bullets.push(...ship.tryShoot());
   }
 
+  // Activar triple shot (tecla de prueba)
+  if (pressed('KeyT')) ship.tripleShot = 5;
+
   ship.update(dt);
   bullets.forEach(b => b.update(dt));
   asteroids.forEach(a => a.update(dt));
@@ -530,11 +544,18 @@ function drawHUD() {
   ctx.textAlign = 'left';
   ctx.fillText(`SCORE  ${score}`, 14, 26);
 
+  // Power-ups activos, apilados bajo el score
+  let py = 46;
   if (state === 'playing' && ship.speedBoost > 0) {
     ctx.fillStyle = '#0ff';
-    ctx.fillText(`VELOCIDAD ${ship.speedBoost.toFixed(1)}s`, 14, 46);
-    ctx.fillStyle = '#fff';
+    ctx.fillText(`VELOCIDAD ${ship.speedBoost.toFixed(1)}s`, 14, py);
+    py += 20;
   }
+  if (state === 'playing' && ship.tripleShot > 0) {
+    ctx.fillStyle = '#ff0';
+    ctx.fillText(`TRIPLE ${ship.tripleShot.toFixed(1)}s`, 14, py);
+  }
+  ctx.fillStyle = '#fff';
 
   ctx.textAlign = 'center';
   ctx.fillText(`NIVEL ${level}`, W / 2, 26);
