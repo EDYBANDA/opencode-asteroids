@@ -189,9 +189,10 @@ class EstrellaFugaz extends Asteroid {
   }
 }
 
-// ── Power-up "Velocidad" ──────────────────────────────────────────────────────
+// ── Power-ups ("Velocidad" y "Escudo") ─────────────────────────────────────────
 class PowerUp {
-  constructor(x, y) {
+  constructor(x, y, type = 'velocidad') {
+    this.type = type;
     this.x = x;
     this.y = y;
     const angle = rand(0, Math.PI * 2);
@@ -220,17 +221,31 @@ class PowerUp {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.scale(pulse, pulse);
-    ctx.strokeStyle = '#0ff';
+    ctx.strokeStyle = this.type === 'escudo' ? '#0f0' : '#0ff';
     ctx.lineWidth   = 1.5;
     ctx.lineJoin    = 'round';
 
-    // Rayo estilizado
-    ctx.beginPath();
-    ctx.moveTo( 3, -8);
-    ctx.lineTo(-3,  0);
-    ctx.lineTo( 0,  0);
-    ctx.lineTo(-3,  8);
-    ctx.stroke();
+    if (this.type === 'escudo') {
+      // Hexágono (contorno de escudo)
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        const px = Math.cos(a) * 9;
+        const py = Math.sin(a) * 9;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    } else {
+      // Rayo estilizado
+      ctx.beginPath();
+      ctx.moveTo( 3, -8);
+      ctx.lineTo(-3,  0);
+      ctx.lineTo( 0,  0);
+      ctx.lineTo(-3,  8);
+      ctx.stroke();
+    }
     ctx.restore();
   }
 }
@@ -250,6 +265,7 @@ class Ship {
     this.invincible    = 3;
     this.shootCooldown = 0;
     this.speedBoost    = 0;
+    this.shield        = 0;
     this.dead          = false;
   }
 
@@ -258,6 +274,7 @@ class Ship {
     if (this.invincible    > 0) this.invincible    -= dt;
     if (this.shootCooldown > 0) this.shootCooldown -= dt;
     if (this.speedBoost    > 0) this.speedBoost    -= dt;
+    if (this.shield        > 0) this.shield        -= dt;
 
     const ROT   = 3.5;   // rad/s
     const THRUST = this.speedBoost > 0 ? 520 : 260;  // px/s² (x2 con "Velocidad")
@@ -317,6 +334,14 @@ class Ship {
       ctx.strokeStyle = this.speedBoost > 0
         ? 'rgba(0, 255, 255, 0.9)'
         : 'rgba(255, 130, 0, 0.85)';
+      ctx.stroke();
+    }
+
+    // Burbuja del escudo (parpadea al expirar)
+    if (this.shield > 0 && !(this.shield < 2 && Math.floor(this.shield * 8) % 2 === 0)) {
+      ctx.strokeStyle = 'rgba(0, 255, 0, 0.7)';
+      ctx.beginPath();
+      ctx.arc(0, 0, 22, 0, Math.PI * 2);
       ctx.stroke();
     }
 
@@ -472,18 +497,25 @@ function update(dt) {
         score += a.points;
         explode(a.x, a.y, a.fugaz ? 12 : a.size * 5, a.fugaz ? '255,215,94' : undefined);
         newAsteroids.push(...a.split());
-        if (Math.random() < 0.12) powerups.push(new PowerUp(a.x, a.y));
+        if (Math.random() < 0.12)
+          powerups.push(new PowerUp(a.x, a.y, Math.random() < 0.5 ? 'velocidad' : 'escudo'));
       }
     }
   }
   asteroids = asteroids.filter(a => !a.dead).concat(newAsteroids);
   bullets   = bullets.filter(b => !b.dead);
 
-  // Nave vs asteroide
+  // Nave vs asteroide (con escudo, el asteroide se destruye sin dar puntos)
   if (ship.invincible <= 0) {
     for (const a of asteroids) {
       if (dist(ship, a) < ship.radius + a.radius * 0.82) {
-        killShip();
+        if (ship.shield > 0) {
+          a.dead = true;
+          explode(a.x, a.y, a.fugaz ? 12 : a.size * 5, '0,255,0');
+          asteroids.push(...a.split());
+        } else {
+          killShip();
+        }
         break;
       }
     }
@@ -494,8 +526,13 @@ function update(dt) {
     for (const p of powerups) {
       if (dist(ship, p) < ship.radius + p.radius) {
         p.dead = true;
-        ship.speedBoost = 5;
-        explode(ship.x, ship.y, 6, '0,255,255');
+        if (p.type === 'escudo') {
+          ship.shield = 5;
+          explode(ship.x, ship.y, 6, '0,255,0');
+        } else {
+          ship.speedBoost = 5;
+          explode(ship.x, ship.y, 6, '0,255,255');
+        }
         break;
       }
     }
@@ -530,11 +567,18 @@ function drawHUD() {
   ctx.textAlign = 'left';
   ctx.fillText(`SCORE  ${score}`, 14, 26);
 
+  // Estados activos apilados bajo el marcador
+  let statusY = 46;
   if (state === 'playing' && ship.speedBoost > 0) {
     ctx.fillStyle = '#0ff';
-    ctx.fillText(`VELOCIDAD ${ship.speedBoost.toFixed(1)}s`, 14, 46);
-    ctx.fillStyle = '#fff';
+    ctx.fillText(`VELOCIDAD ${ship.speedBoost.toFixed(1)}s`, 14, statusY);
+    statusY += 20;
   }
+  if (state === 'playing' && ship.shield > 0) {
+    ctx.fillStyle = '#0f0';
+    ctx.fillText(`ESCUDO ${ship.shield.toFixed(1)}s`, 14, statusY);
+  }
+  ctx.fillStyle = '#fff';
 
   ctx.textAlign = 'center';
   ctx.fillText(`NIVEL ${level}`, W / 2, 26);
