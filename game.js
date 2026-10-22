@@ -33,6 +33,8 @@ const randInt = (min, max) => Math.floor(rand(min, max + 1));
 // Cada skin define la silueta (verts mirando a +x), el color del trazo y la
 // llama del propulsor. La llama cian del power-up "Velocidad" es común a todas
 // para que el aviso de boost siempre se distinga.
+// Campos opcionales: scale (tamaño relativo de la nave, por defecto 1) y
+// mult (multiplicador de puntos al destruir, por defecto 1).
 const SKINS = [
   { name: 'CLÁSICA',     color: '#fff', flame: 'rgba(255,130,0,0.85)',   flameX: -8,
     verts: [[20,0],[-12,-9],[-7,0],[-12,9]] },
@@ -44,6 +46,10 @@ const SKINS = [
     verts: [[16,0],[2,-4],[-6,-12],[-9,-4],[-5,0],[-9,4],[-6,12],[2,4]] },
   { name: 'COLIBRÍ',     color: '#f6f', flame: 'rgba(255,120,220,0.85)',  flameX: -6,
     verts: [[13,0],[7,-8],[-6,-9],[-9,-3],[-6,0],[-9,3],[-6,9],[7,8]] },
+  // Nave morada el doble de grande: otorga el doble de puntos, pero su hitbox
+  // también es el doble de grande, así que es más fácil de golpear.
+  { name: 'TITÁN',       color: '#a855f7', flame: 'rgba(200,120,255,0.85)', flameX: -8,
+    verts: [[20,0],[-12,-9],[-7,0],[-12,9]], scale: 2, mult: 2 },
 ];
 
 const STORAGE_KEY = 'asteroids-skin';
@@ -61,6 +67,10 @@ function saveSkinIndex(i) {
 
 let skinIndex = loadSkinIndex();
 let skinToast = 0;   // segundos restantes del aviso "NAVE: ..." en el HUD
+
+// Propiedades opcionales de la skin activa (con valores por defecto)
+const skinScale = () => SKINS[skinIndex].scale ?? 1;
+const skinMult  = () => SKINS[skinIndex].mult  ?? 1;
 
 function cycleSkin() {
   skinIndex = (skinIndex + 1) % SKINS.length;
@@ -293,13 +303,16 @@ class PowerUp {
 class Ship {
   constructor() { this.reset(); }
 
+  // El radio de colisión escala con la skin activa (p. ej. TITÁN = x2),
+  // incluso si se cambia de skin en mitad de la partida
+  get radius() { return 12 * skinScale(); }
+
   reset() {
     this.x      = W / 2;
     this.y      = H / 2;
     this.angle  = -Math.PI / 2;
     this.vx     = 0;
     this.vy     = 0;
-    this.radius = 12;
     this.thrusting     = false;
     this.invincible    = 3;
     this.shootCooldown = 0;
@@ -339,7 +352,7 @@ class Ship {
   tryShoot() {
     if (this.shootCooldown > 0 || this.dead) return [];
     this.shootCooldown = 0.2;
-    const NOSE = 21;
+    const NOSE = 21 * skinScale();   // las balas nacen en la punta de la nave
     const ox = this.x + Math.cos(this.angle) * NOSE;
     const oy = this.y + Math.sin(this.angle) * NOSE;
     // Abanico de 3 balas mientras dura el triple shot
@@ -360,10 +373,12 @@ class Ship {
     if (this.invincible > 0 && Math.floor(this.invincible * 8) % 2 === 0) return;
 
     const skin = SKINS[skinIndex];
+    const s = skinScale();
 
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
+    ctx.scale(s, s);   // silueta, llama y escudo escalan con la skin
     ctx.strokeStyle = skin.color;
     ctx.lineWidth   = 1.5;
     ctx.lineJoin    = 'round';
@@ -553,7 +568,7 @@ function update(dt) {
       if (!a.dead && !b.dead && dist(b, a) < a.radius) {
         b.dead = true;
         a.dead = true;
-        score += a.points;
+        score += a.points * skinMult();
         explode(a.x, a.y, a.fugaz ? 12 : a.size * 5, a.fugaz ? '255,215,94' : undefined);
         newAsteroids.push(...a.split());
         if (Math.random() < 0.12)
@@ -629,6 +644,12 @@ function drawHUD() {
 
   // Power-ups activos, apilados bajo el score
   let py = 46;
+  // Multiplicador de puntos de la skin activa (p. ej. TITÁN)
+  if (state === 'playing' && skinMult() > 1) {
+    ctx.fillStyle = SKINS[skinIndex].color;
+    ctx.fillText(`PUNTOS x${skinMult()}`, 14, py);
+    py += 20;
+  }
   if (state === 'playing' && ship.speedBoost > 0) {
     ctx.fillStyle = '#0ff';
     ctx.fillText(`VELOCIDAD ${ship.speedBoost.toFixed(1)}s`, 14, py);
