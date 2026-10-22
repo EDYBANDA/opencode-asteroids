@@ -39,6 +39,8 @@ Luego visita `http://localhost:3000`.
 | Mediano   | 50     |
 | Pequeño   | 100    |
 
+Con la nave **TITÁN** todos los puntos se duplican (incluido el bonus de la estrella fugaz).
+
 ## Características
 
 - 3 vidas con invencibilidad temporal al reaparecer (parpadeo)
@@ -46,4 +48,5 @@ Luego visita `http://localhost:3000`.
 - Partículas de explosión al destruir asteroides
 - Estrella fugaz: asteroide dorado veloz que aparece cada 8–15 s, se desvanece sola con el tiempo y otorga 250 puntos si logras destruirla
 - Sistema de skins: cambia la apariencia de la nave (silueta y color) con `S`; la elección se recuerda entre sesiones
+- Nave **TITÁN**: morada y el doble de grande que la original, otorga el doble de puntos al destruir asteroides, a cambio de un hitbox también doble
 - Power-ups que sueltan los asteroides destruidos (12%): **Velocidad** (rayo cian) duplica el empuje 5 s; **Escudo** (hexágono verde) protege de colisiones 5 s, destruyendo sin puntos lo que toque
