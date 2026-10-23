@@ -1,0 +1,140 @@
+name: Formatear issue
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  formatear:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Formatear cuerpo y aplicar labels
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const MARCADOR = '<!-- auto-formatted -->';
+            const issue = context.payload.issue;
+
+            if ((issue.body || '').includes(MARCADOR)) {
+              core.info(`El issue #${issue.number} ya contiene el marcador de formateo; no se hace nada.`);
+              return;
+            }
+
+            const KEYWORDS = {
+              bug: [
+                'error',
+                'fallo',
+                'falla',
+                'no funciona',
+                'se rompe',
+                'roto',
+                'crash',
+                'excepción',
+                'excepcion',
+                'bug',
+                'glitch',
+                'broken'
+              ],
+              enhancement: [
+                'mejora',
+                'mejorar',
+                'añadir',
+                'añada',
+                'agregar',
+                'sugerencia',
+                'idea',
+                'podría',
+                'sería bueno',
+                'feature',
+                'enhancement',
+                'request'
+              ],
+              documentation: [
+                'docs',
+                'documentación',
+                'documentacion',
+                'readme',
+                'documentar'
+              ],
+              question: [
+                'duda',
+                'pregunta',
+                'cómo',
+                'como puedo',
+                'how to',
+                'how do',
+                'ayuda'
+              ]
+            };
+
+            const COLORES = {
+              bug: 'd73a4a',
+              enhancement: 'a2eeef',
+              documentation: '0075ca',
+              question: 'cc317c',
+              'needs-triage': 'fef2c2'
+            };
+
+            const texto = `${issue.title} ${issue.body || ''}`.toLowerCase();
+            const labels = ['needs-triage'];
+
+            for (const [label, palabras] of Object.entries(KEYWORDS)) {
+              if (palabras.some((palabra) => texto.includes(palabra))) {
+                labels.push(label);
+              }
+            }
+
+            const existentes = new Set(
+              (
+                await github.paginate(github.rest.issues.listLabelsForRepo, {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  per_page: 100
+                })
+              ).map((label) => label.name)
+            );
+
+            for (const label of labels) {
+              if (!existentes.has(label)) {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label,
+                  color: COLORES[label] || 'ededed'
+                });
+                core.info(`Label creada: ${label}`);
+              }
+            }
+
+            const fecha = `${new Date(issue.created_at).toLocaleString('es-ES', {
+              dateStyle: 'long',
+              timeStyle: 'short',
+              timeZone: 'UTC'
+            })} UTC`;
+
+            const cuerpo = [
+              MARCADOR,
+              '> [!NOTE]',
+              `> **Issue #${issue.number}** · creado por @${issue.user.login} el ${fecha} · [enlace permanente](${issue.html_url})`,
+              `> **Auto-triage:** ${labels.map((label) => `\`${label}\``).join(', ')}`,
+              '',
+              '---',
+              '',
+              '## Contenido original',
+              '',
+              issue.body || '_(sin descripción)_'
+            ].join('\n');
+
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: cuerpo,
+              labels: labels
+            });
+
+            core.info(`Issue #${issue.number} formateado con las labels: ${labels.join(', ')}`);
