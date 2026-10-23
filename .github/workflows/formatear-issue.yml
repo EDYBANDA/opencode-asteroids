@@ -17,6 +17,7 @@ jobs:
         with:
           script: |
             const MARCADOR = '<!-- auto-formatted -->';
+            const LIMITE_RESUMEN = 200;
             const issue = context.payload.issue;
 
             if ((issue.body || '').includes(MARCADOR)) {
@@ -110,11 +111,38 @@ jobs:
               }
             }
 
+            function construirResumen(titulo, cuerpo) {
+              const parrafos = (cuerpo || '')
+                .replace(/\r/g, '')
+                .split(/\n\s*\n/)
+                .map((parrafo) => parrafo.trim())
+                .filter(Boolean);
+              const elegido = parrafos.find((parrafo) => !parrafo.startsWith('#'));
+              let resumen = (elegido || titulo)
+                .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+                .replace(/[*_`]+/g, '')
+                .replace(/^#+\s*/, '')
+                .replace(/^!+/, '')
+                .replace(/^[-*+]\s+/gm, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+              if (resumen.length > LIMITE_RESUMEN) {
+                const corte = resumen.slice(0, LIMITE_RESUMEN);
+                const idx = corte.lastIndexOf(' ');
+                resumen = `${(idx > 0 ? corte.slice(0, idx) : corte).trim()}…`;
+              }
+              return resumen || '_(sin descripción)_';
+            }
+
             const fecha = `${new Date(issue.created_at).toLocaleString('es-ES', {
               dateStyle: 'long',
               timeStyle: 'short',
               timeZone: 'UTC'
             })} UTC`;
+
+            const rama = context.payload.repository.default_branch || 'main';
+            const urlRepo = context.payload.repository.html_url;
+            const resumen = construirResumen(issue.title, issue.body);
 
             const cuerpo = [
               MARCADOR,
@@ -122,9 +150,21 @@ jobs:
               `> **Issue #${issue.number}** · creado por @${issue.user.login} el ${fecha} · [enlace permanente](${issue.html_url})`,
               `> **Auto-triage:** ${labels.map((label) => `\`${label}\``).join(', ')}`,
               '',
+              '## Resumen',
+              '',
+              resumen,
+              '',
+              '## Información relevante',
+              '',
+              `- [README](${urlRepo}/blob/${rama}/README.md) — descripción del juego, controles y puntuación`,
+              `- [AGENTS.md](${urlRepo}/blob/${rama}/AGENTS.md) — convenciones del repo para colaboradores y agentes`,
+              `- [game.js](${urlRepo}/blob/${rama}/game.js) — toda la lógica del juego`,
+              '',
+              'Para correr el juego: `npx serve .` y abrir `http://localhost:3000`, o abrir `index.html` directamente.',
+              '',
               '---',
               '',
-              '## Contenido original',
+              '## Descripción',
               '',
               issue.body || '_(sin descripción)_'
             ].join('\n');

@@ -1,0 +1,36 @@
+name: Resumen IA de issue
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  resumen-ia:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Analizar issue con OpenCode
+        uses: anomalyco/opencode/github@latest
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        with:
+          model: opencode-go/glm-5.3
+          prompt: |
+            Un issue nuevo acaba de crearse en este repositorio: un clon de Asteroids en JavaScript vanilla, sin dependencias, con toda la lógica en game.js y el README con controles y puntuación.
+            Analiza el issue y publica un comentario en español con estas secciones:
+            ## Resumen
+            2-4 frases explicando qué problema o petición plantea.
+            ## Información relevante
+            Pistas concretas para quien lo revise: en qué parte de game.js conviene mirar, posibles causas o puntos de diseño a considerar. Cita funciones o variables del código si aplica.
+            ## Pasos para reproducir/investigar
+            Cómo reproducirlo o investigarlo localmente (npx serve . o abrir index.html).
+            Solo publica el comentario de análisis; no modifiques código, no hagas commits ni abras pull requests.
